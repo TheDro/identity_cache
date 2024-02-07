@@ -28,6 +28,10 @@ module IdentityCache
         @cached_primary_index ||= Cached::PrimaryIndex.new(self)
       end
 
+      def set_expiry(expiry)
+        @my_expiry = expiry
+      end
+
       def primary_cache_index_enabled
         true
       end
@@ -140,7 +144,8 @@ module IdentityCache
       # @raise [ActiveRecord::RecordNotFound] if the record isn't found
       # @return [self] An instance of this model for the record with the specified id
       def fetch(id, **options)
-        fetch_by_id(id, **options) || raise(
+        merged_options = {expiration_options: {expires_in: @my_expiry}}.merge(options)
+        fetch_by_id(id, **merged_options) || raise(
           IdentityCache::RecordNotFound, "Couldn't find #{name} with ID=#{id}"
         )
       end
