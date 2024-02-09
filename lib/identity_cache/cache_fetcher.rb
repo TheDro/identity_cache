@@ -52,8 +52,8 @@ module IdentityCache
       @cache_backend = cache_backend
     end
 
-    def write(key, value)
-      @cache_backend.write(key, value) if IdentityCache.should_fill_cache?
+    def write(key, value, expiration_options = EMPTY_HASH)
+      @cache_backend.write(key, value, expiration_options) if IdentityCache.should_fill_cache?
     end
 
     def delete(key)
@@ -106,7 +106,6 @@ module IdentityCache
 
       lock = nil
       using_fallback_key = false
-      # expiration_options = EMPTY_HASH
       (lock_wait_tries + 2).times do # +2 is for first attempt and retry with fallback key
         result = fetch_or_take_lock(key, old_lock: lock, **expiration_options)
         case result
@@ -135,7 +134,7 @@ module IdentityCache
             # so avoid waiting the typical amount of time for a lock wait. The
             # semian gem can be used to handle failing fast when the database is slow.
             if lock.fill_failed?
-              return fetch_without_fill_lock(key, &block)
+              return fetch_without_fill_lock(key, expiration_options, &block)
             end
 
             # lock wait
@@ -184,7 +183,6 @@ module IdentityCache
     end
 
     def upsert(key, expiration_options = EMPTY_HASH)
-      # binding.pry
       yielded = false
       upserted = @cache_backend.cas(key, expiration_options) do |value|
         yielded = true
@@ -310,8 +308,6 @@ module IdentityCache
     end
 
     def add(key, value, expiration_options = EMPTY_HASH)
-      ap caller
-      # binding.pry
       return false unless IdentityCache.should_fill_cache?
 
       @cache_backend.write(key, value, { unless_exist: true, **expiration_options })
